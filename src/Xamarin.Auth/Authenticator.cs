@@ -20,6 +20,7 @@ using System.Threading;
 using Xamarin.Utilities;
 
 #if PLATFORM_IOS
+using MonoTouch.UIKit;
 using AuthenticateUIType = MonoTouch.UIKit.UIViewController;
 #elif PLATFORM_ANDROID
 using AuthenticateUIType = Android.Content.Intent;
@@ -87,6 +88,36 @@ namespace Xamarin.Auth
 			return GetPlatformUI (context);
 		}
 		protected abstract AuthenticateUIType GetPlatformUI (UIContext context);
+#elif PLATFORM_IOS
+	/// <summary>
+	/// Gets the UI for this authenticator.
+	/// </summary>
+	/// <returns>
+	/// The UI that needs to be presented.
+	/// </returns>
+	public AuthenticateUIType GetUI (UIView view = null)
+	{
+		return GetPlatformUI (view);
+	}
+	public void SetUI (AuthenticateUIType controller)
+	{
+		SetPlatformUI (controller);
+	}
+	/// <summary>
+	/// Gets the UI for this authenticator.
+	/// </summary>
+	/// <returns>
+	/// The UI that needs to be presented.
+	/// </returns>
+	protected abstract AuthenticateUIType GetPlatformUI ();
+	protected virtual AuthenticateUIType GetPlatformUI (UIView view)
+	{
+		throw new NotImplementedException();
+	}
+	protected virtual void SetPlatformUI (AuthenticateUIType controller)
+	{
+		throw new NotImplementedException();
+	}
 #else
 		/// <summary>
 		/// Gets the UI for this authenticator.
@@ -98,7 +129,6 @@ namespace Xamarin.Auth
 		{
 			return GetPlatformUI ();
 		}
-
 		/// <summary>
 		/// Gets the UI for this authenticator.
 		/// </summary>

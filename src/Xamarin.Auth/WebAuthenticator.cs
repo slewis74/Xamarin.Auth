@@ -17,8 +17,10 @@ using System;
 using System.Collections.Generic;
 using System.Threading.Tasks;
 using System.Threading;
+using System.Diagnostics;
 
 #if PLATFORM_IOS
+using MonoTouch.UIKit;
 using AuthenticateUIType = MonoTouch.UIKit.UIViewController;
 #elif PLATFORM_ANDROID
 using AuthenticateUIType = Android.Content.Intent;
@@ -123,6 +125,19 @@ namespace Xamarin.Auth
 		protected override AuthenticateUIType GetPlatformUI ()
 		{
 			return new MonoTouch.UIKit.UINavigationController (new WebAuthenticatorController (this));
+		}
+		protected override AuthenticateUIType GetPlatformUI (UIView view)
+		{
+			var navigation = new MonoTouch.UIKit.UINavigationController (new WebAuthenticatorController(this, view));
+		
+			return navigation;
+		}
+		protected override void SetPlatformUI (AuthenticateUIType controller)
+		{
+			var view = new WebAuthenticatorView(this, controller);
+			view.Frame = controller.View.Bounds;
+
+			controller.View.AddSubview(view);
 		}
 #elif PLATFORM_ANDROID
 		/// <summary>
