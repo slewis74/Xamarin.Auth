@@ -19,7 +19,6 @@ using MonoTouch.UIKit;
 using MonoTouch.Foundation;
 using Xamarin.Utilities.iOS;
 using Xamarin.Controls;
-using System.Diagnostics;
 using System.Drawing;
 
 namespace Xamarin.Auth
@@ -40,45 +39,43 @@ namespace Xamarin.Auth
 			this.authenticator = authenticator;
 			this.parent = parent;
 
-			authenticator.Error += HandleError;
+            authenticator.Error += HandleError;
 			authenticator.BrowsingCompleted += HandleBrowsingCompleted;
 
-			var bounds = new RectangleF(0, 60, parent.View.Bounds.Width, parent.View.Bounds.Height - 60);
+            var bounds = new RectangleF(0, 60, parent.View.Bounds.Width, parent.View.Bounds.Height - 60);
 
-			if(parent.NavigationItem == null || parent.NavigationItem.TitleView.Hidden)
+            if (!(parent is WebAuthenticatorController))
 			{
-				bounds = new RectangleF(0, 10, parent.View.Bounds.Width, parent.View.Bounds.Height - 10);
+                bounds = new RectangleF(0, 20, parent.View.Bounds.Width, parent.View.Bounds.Height - 20);
 			}
 
-			webView = new UIWebView (bounds) {
+            webView = new UIWebView (bounds) {
 				Delegate = new WebViewDelegate (this)
 			};
 
-			if(loadingView != null) Add(loadingView);
+            if (loadingView != null)
+            {
+                Add (loadingView);
+            }
 
-			Add(webView);
+            Add(webView);
 
-			BeginLoadingInitialUrl ();
+            BeginLoadingInitialUrl ();
 		}
 
 		public void Cancel ()
 		{
-			Debug.WriteLine("Cancel");
 			authenticator.OnCancelled ();
 		}
 
 		void BeginLoadingInitialUrl ()
 		{
-			Debug.WriteLine("BeginLoadingInitialUrl");
 			authenticator.GetInitialUrlAsync ().ContinueWith (t => {
-				Debug.WriteLine("Inital Done");
 				if (t.IsFaulted) {
-					Debug.WriteLine("Faulted");
 					keepTryingAfterError = false;
 					authenticator.OnError (t.Exception);
 				}
 				else {
-					Debug.WriteLine("Non-faulted");
 					// Delete cookies so we can work with multiple accounts
 					if (this.authenticator.ClearCookiesBeforeLogin)
 						WebAuthenticator.ClearCookies();
@@ -93,10 +90,7 @@ namespace Xamarin.Auth
 
 		void LoadInitialUrl (Uri url)
 		{
-			Debug.WriteLine("LoadInitialUrl");
-
 			if (url != null) {
-				Debug.WriteLine("Url is not null");
 				var request = new NSUrlRequest (new NSUrl (url.AbsoluteUri));
 				NSUrlCache.SharedCache.RemoveCachedResponse (request); // Always try
 				webView.LoadRequest (request);
@@ -105,8 +99,6 @@ namespace Xamarin.Auth
 
 		void HandleBrowsingCompleted (object sender, EventArgs e)
 		{
-			Debug.WriteLine("HandleBrowsingCompleted");
-
 			if (authenticatingView == null) {
 				authenticatingView = new UIView (Bounds) {
 					AutoresizingMask = UIViewAutoresizing.FlexibleWidth | UIViewAutoresizing.FlexibleHeight,
@@ -128,7 +120,6 @@ namespace Xamarin.Auth
 
 		void HandleError (object sender, AuthenticatorErrorEventArgs e)
 		{
-			Debug.WriteLine("HandleError");
 			var after = keepTryingAfterError ?
 				(Action)BeginLoadingInitialUrl :
 				(Action)Cancel;
@@ -153,7 +144,6 @@ namespace Xamarin.Auth
 
 			public override bool ShouldStartLoad (UIWebView webView, NSUrlRequest request, UIWebViewNavigationType navigationType)
 			{
-				Debug.WriteLine("ShouldStartLoad");
 				var nsUrl = request.Url;
 
 				if (nsUrl != null && !view.authenticator.HasCompleted) {
@@ -170,14 +160,11 @@ namespace Xamarin.Auth
 			{
 				webView.Hidden = true;
 
-				Debug.WriteLine("LoadStarted");
-
 				webView.UserInteractionEnabled = false;
 			}
 
 			public override void LoadFailed (UIWebView webView, NSError error)
 			{
-				Debug.WriteLine("LoadFailed");
 				if (error.Domain == "NSURLErrorDomain" && error.Code == -999)
 					return;
 
@@ -189,8 +176,6 @@ namespace Xamarin.Auth
 			public override void LoadingFinished (UIWebView webView)
 			{
 				if(!view.authenticator.HasCompleted) webView.Hidden = false;
-
-				Debug.WriteLine("LoadingFinished");
 
 				webView.UserInteractionEnabled = true;
 
