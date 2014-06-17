@@ -50,7 +50,8 @@ namespace Xamarin.Auth
 			}
 
             webView = new UIWebView (bounds) {
-				Delegate = new WebViewDelegate (this)
+				Delegate = new WebViewDelegate (this),
+                Hidden = true
 			};
 
             if (loadingView != null)
@@ -158,9 +159,7 @@ namespace Xamarin.Auth
 
 			public override void LoadStarted (UIWebView webView)
 			{
-				webView.Hidden = true;
-
-				webView.UserInteractionEnabled = false;
+                ShowProgressBar (webView);
 			}
 
 			public override void LoadFailed (UIWebView webView, NSError error)
@@ -168,23 +167,64 @@ namespace Xamarin.Auth
 				if (error.Domain == "NSURLErrorDomain" && error.Code == -999)
 					return;
 
-				webView.UserInteractionEnabled = true;
+                HideProgressBar (webView);
 
 				view.authenticator.OnError (error.LocalizedDescription);
 			}
 
 			public override void LoadingFinished (UIWebView webView)
 			{
-				if(!view.authenticator.HasCompleted) webView.Hidden = false;
+                HideProgressBar (webView);
 
-				webView.UserInteractionEnabled = true;
-
-				var url = new Uri (webView.Request.Url.AbsoluteString);
+                var url = new Uri (webView.Request.Url.AbsoluteString);
 				if (url != lastUrl && !view.authenticator.HasCompleted) {
 					lastUrl = url;
 					view.authenticator.OnPageLoaded (url);
 				}
 			}
+
+            private bool _continueWithShowingBrowser;
+
+            /// <summary>
+            /// Shows the progress bar and hides the browser control.
+            /// </summary>
+            public void ShowProgressBar(UIWebView webView)
+            {
+                _continueWithShowingBrowser = false;
+
+                webView.Hidden = true;
+                webView.UserInteractionEnabled = false;
+            }
+
+            /// <summary>
+            /// Hides the progress bar and shows the browser control.
+            /// </summary>
+            private void HideProgressBar(UIWebView webView)
+            {
+                if (!view.authenticator.HasCompleted)
+                {
+                    _continueWithShowingBrowser = true;
+                    StartTimer (webView);
+                }
+            }
+
+            private async void StartTimer(UIWebView webView)
+            {
+                await Task.Delay (150);
+
+                if (!_continueWithShowingBrowser)
+                {
+                    return;
+                }
+
+                _continueWithShowingBrowser = false;
+
+                if (!view.authenticator.HasCompleted)
+                {
+                    webView.Hidden = false;
+                    webView.UserInteractionEnabled = true;
+                }
+            }
 		}
 	}
 	
