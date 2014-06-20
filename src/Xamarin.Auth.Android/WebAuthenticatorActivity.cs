@@ -16,11 +16,11 @@
 using System;
 using System.Collections.Generic;
 using Android.App;
-using Android.Net.Http;
-using Android.Webkit;
 using Android.OS;
-using System.Threading.Tasks;
 using Xamarin.Utilities.Android;
+using Android.Widget;
+using Android.Views;
+using Android.Graphics;
 
 namespace Xamarin.Auth
 {
@@ -31,8 +31,6 @@ namespace Xamarin.Auth
 	public class WebAuthenticatorActivity : Activity
 #endif
 	{
-		WebView webView;
-
 		internal class State : Java.Lang.Object
 		{
 			public WebAuthenticator Authenticator;
@@ -44,7 +42,7 @@ namespace Xamarin.Auth
 		protected override void OnCreate (Bundle savedInstanceState)
 		{
 			base.OnCreate (savedInstanceState);
-
+            
 			//
 			// Load the state either from a configuration change or from the intent.
 			//
@@ -74,43 +72,53 @@ namespace Xamarin.Auth
 				else {
 					this.ShowError ("Authentication Error", e.Message);
 				}
-				BeginLoadingInitialUrl ();
 			};
 
 			//
 			// Build the UI
 			//
-			webView = new WebView (this) {
-				Id = 42,
-			};
-			webView.Settings.JavaScriptEnabled = true;
-			webView.SetWebViewClient (new Client (this));
-			SetContentView (webView);
+            var relativeLayout = new RelativeLayout (this);
+            relativeLayout.SetBackgroundColor(Color.White);
 
-			//
-			// Restore the UI state or start over
-			//
-			if (savedInstanceState != null) {
-				webView.RestoreState (savedInstanceState);
-			}
-			else {
-				if (Intent.GetBooleanExtra ("ClearCookies", true))
-					WebAuthenticator.ClearCookies();
+            var linearLayout = new LinearLayout (this)
+            {
+                Orientation = Orientation.Vertical,
+                LayoutParameters = new LinearLayout.LayoutParams (
+                    LinearLayout.LayoutParams.FillParent,
+                    LinearLayout.LayoutParams.MatchParent)
+            };
+            linearLayout.SetGravity (GravityFlags.Bottom);
 
-				BeginLoadingInitialUrl ();
-			}
-		}
+            var progressBar = new ProgressBar (this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams (
+                    LinearLayout.LayoutParams.FillParent,
+                    dpToPx(40))
+            };
+            linearLayout.AddView (progressBar);
 
-		void BeginLoadingInitialUrl ()
-		{
-			state.Authenticator.GetInitialUrlAsync ().ContinueWith (t => {
-				if (t.IsFaulted) {
-					this.ShowError ("Authentication Error", t.Exception);
-				}
-				else {
-					webView.LoadUrl (t.Result.AbsoluteUri);
-				}
-			}, TaskScheduler.FromCurrentSynchronizationContext ());
+            var textView = new TextView(this)
+            {
+                LayoutParameters = new LinearLayout.LayoutParams (
+                    LinearLayout.LayoutParams.WrapContent,
+                    LinearLayout.LayoutParams.WrapContent) { Gravity = GravityFlags.CenterHorizontal },
+                Text = "Logging in..."                               
+            };
+            ((ViewGroup.MarginLayoutParams)textView.LayoutParameters).BottomMargin = dpToPx(75);
+            linearLayout.AddView (textView);
+
+            relativeLayout.AddView (linearLayout);
+
+            AddContentView (relativeLayout, new LinearLayout.LayoutParams (
+                Android.Views.ViewGroup.LayoutParams.FillParent,
+                Android.Views.ViewGroup.LayoutParams.MatchParent) { Gravity = GravityFlags.Bottom } );
+
+            var details = WebAuthenticatorFragment.NewInstance(state.Authenticator);
+            var fragmentTransaction = this.FragmentManager.BeginTransaction();
+            fragmentTransaction.Add(Android.Resource.Id.Content, details);
+            fragmentTransaction.Commit();
+
+            details.BeginLoadingInitialUrl ();
 		}
 
 		public override void OnBackPressed ()
@@ -126,138 +134,10 @@ namespace Xamarin.Auth
 			return state;
 		}
 
-		protected override void OnSaveInstanceState (Bundle outState)
-		{
-			base.OnSaveInstanceState (outState);
-			webView.SaveState (outState);
-		}
-
-		void BeginProgress (string message)
-		{
-			webView.Enabled = false;
-		}
-
-		void EndProgress ()
-		{
-			webView.Enabled = true;
-		}
-
-		class Client : WebViewClient
-		{
-			WebAuthenticatorActivity activity;
-			HashSet<SslCertificate> sslContinue;
-			Dictionary<SslCertificate, List<SslErrorHandler>> inProgress;
-
-			public Client (WebAuthenticatorActivity activity)
-			{
-				this.activity = activity;
-			}
-
-			public override bool ShouldOverrideUrlLoading (WebView view, string url)
-			{
-				return false;
-			}
-
-			public override void OnPageStarted (WebView view, string url, Android.Graphics.Bitmap favicon)
-			{
-				var uri = new Uri (url);
-				activity.state.Authenticator.OnPageLoading (uri);
-				activity.BeginProgress (uri.Authority);
-			}
-
-			public override void OnPageFinished (WebView view, string url)
-			{
-				var uri = new Uri (url);
-				activity.state.Authenticator.OnPageLoaded (uri);
-				activity.EndProgress ();
-			}
-
-			class SslCertificateEqualityComparer
-				: IEqualityComparer<SslCertificate>
-			{
-				public bool Equals (SslCertificate x, SslCertificate y)
-				{
-					return Equals (x.IssuedTo, y.IssuedTo) && Equals (x.IssuedBy, y.IssuedBy) && x.ValidNotBeforeDate.Equals (y.ValidNotBeforeDate) && x.ValidNotAfterDate.Equals (y.ValidNotAfterDate);
-				}
-
-				bool Equals (SslCertificate.DName x, SslCertificate.DName y)
-				{
-					if (ReferenceEquals (x, y))
-						return true;
-					if (ReferenceEquals (x, y) || ReferenceEquals (null, y))
-						return false;
-					return x.GetDName().Equals (y.GetDName());
-				}
-
-				public int GetHashCode (SslCertificate obj)
-				{
-					unchecked {
-						int hashCode = GetHashCode (obj.IssuedTo);
-						hashCode = (hashCode * 397) ^ GetHashCode (obj.IssuedBy);
-						hashCode = (hashCode * 397) ^ obj.ValidNotBeforeDate.GetHashCode();
-						hashCode = (hashCode * 397) ^ obj.ValidNotAfterDate.GetHashCode();
-						return hashCode;
-					}
-				}
-
-				int GetHashCode (SslCertificate.DName dname)
-				{
-					return dname.GetDName().GetHashCode();
-				}
-			}
-
-			public override void OnReceivedSslError (WebView view, SslErrorHandler handler, SslError error)
-			{
-				if (sslContinue == null) {
-					var certComparer = new SslCertificateEqualityComparer();
-					sslContinue = new HashSet<SslCertificate> (certComparer);
-					inProgress = new Dictionary<SslCertificate, List<SslErrorHandler>> (certComparer);
-				}
-
-				List<SslErrorHandler> handlers;
-				if (inProgress.TryGetValue (error.Certificate, out handlers)) {
-					handlers.Add (handler);
-					return;
-				}
-
-				if (sslContinue.Contains (error.Certificate)) {
-					handler.Proceed();
-					return;
-				}
-
-				inProgress[error.Certificate] = new List<SslErrorHandler>();
-
-				AlertDialog.Builder builder = new AlertDialog.Builder (this.activity);
-				builder.SetTitle ("Security warning");
-				builder.SetIcon (Android.Resource.Drawable.IcDialogAlert);
-				builder.SetMessage ("There are problems with the security certificate for this site.");
-				
-				builder.SetNegativeButton ("Go back", (sender, args) => {
-					UpdateInProgressHandlers (error.Certificate, h => h.Cancel());
-					handler.Cancel();
-				});
-
-				builder.SetPositiveButton ("Continue", (sender, args) => {
-					sslContinue.Add (error.Certificate);
-					UpdateInProgressHandlers (error.Certificate, h => h.Proceed());
-					handler.Proceed();
-				});
-				
-				builder.Create().Show();
-			}
-
-			void UpdateInProgressHandlers (SslCertificate certificate, Action<SslErrorHandler> update)
-			{
-				List<SslErrorHandler> inProgressHandlers;
-				if (!this.inProgress.TryGetValue (certificate, out inProgressHandlers))
-					return;
-
-				foreach (SslErrorHandler sslErrorHandler in inProgressHandlers)
-					update (sslErrorHandler);
-
-				inProgressHandlers.Clear();
-			}
-		}
+        public static int dpToPx(int dp)
+        {
+            return (int) (dp * Android.Content.Res.Resources.System.DisplayMetrics.Density);
+        }
 	}
 }
 

@@ -25,6 +25,9 @@ using AuthenticateUIType = MonoTouch.UIKit.UIViewController;
 #elif PLATFORM_ANDROID
 using AuthenticateUIType = Android.Content.Intent;
 using UIContext = Android.Content.Context;
+using Android.App;
+using Android.Views;
+using Android.Widget;
 #else
 using AuthenticateUIType = System.Object;
 #endif
@@ -156,6 +159,18 @@ namespace Xamarin.Auth
 			i.PutExtra ("StateKey", WebAuthenticatorActivity.StateRepo.Add (state));
 			return i;
 		}
+
+        protected override void SetPlatformUI (UIContext context)
+        {
+            var relativeLayout = new RelativeLayout (context);
+            var fragment = WebAuthenticatorFragment.NewInstance (this);
+
+            var fragmentTransaction = ((Activity)context).FragmentManager.BeginTransaction();
+            fragmentTransaction.Add(Android.Resource.Id.Content, fragment);
+            fragmentTransaction.Commit();
+
+            fragment.BeginLoadingInitialUrl ();
+        }
 #else
 		/// <summary>
 		/// Gets the UI for this authenticator.

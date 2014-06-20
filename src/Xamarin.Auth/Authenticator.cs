@@ -88,6 +88,16 @@ namespace Xamarin.Auth
 			return GetPlatformUI (context);
 		}
 		protected abstract AuthenticateUIType GetPlatformUI (UIContext context);
+
+        public void SetUI(UIContext context)
+        {
+            SetPlatformUI (context);
+        }
+        protected virtual void SetPlatformUI (UIContext context)
+        {
+            throw new NotImplementedException();
+        }
+
 #elif PLATFORM_IOS
 	/// <summary>
 	/// Gets the UI for this authenticator.
